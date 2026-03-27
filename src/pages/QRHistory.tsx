@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { History, Search, Trash2, Eye, CheckCircle, Clock } from 'lucide-react'
+import { History, Search, Trash2, Eye, CheckCircle, Clock, ShieldOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
@@ -13,10 +13,11 @@ import type { QRRecord } from '@/types'
 export function QRHistory() {
   const [records,     setRecords]     = useState<QRRecord[]>(() => qrStorage.getAll())
   const [search,      setSearch]      = useState('')
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all')
-  const [viewTarget,  setViewTarget]  = useState<QRRecord | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<QRRecord | null>(null)
-  const [clearConfirm, setClearConfirm] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'revoked'>('all')
+  const [viewTarget,    setViewTarget]    = useState<QRRecord | null>(null)
+  const [deleteTarget,  setDeleteTarget]  = useState<QRRecord | null>(null)
+  const [revokeTarget,  setRevokeTarget]  = useState<QRRecord | null>(null)
+  const [clearConfirm,  setClearConfirm]  = useState(false)
 
   function reload() { setRecords(qrStorage.getAll()) }
 
@@ -27,28 +28,31 @@ export function QRHistory() {
   }, [])
 
   const filtered = useMemo(() => {
-    const now = Math.floor(Date.now() / 1000)
     return records.filter(r => {
       const matchSearch =
         r.employeeName.toLowerCase().includes(search.toLowerCase()) ||
         r.systemName.toLowerCase().includes(search.toLowerCase()) ||
         r.employeeId.toLowerCase().includes(search.toLowerCase())
 
-      const status = r.expiresAt > now ? 'active' : 'expired'
-      const matchStatus = filterStatus === 'all' || filterStatus === status
+      const matchStatus = filterStatus === 'all' || getQRStatus(r) === filterStatus
 
       return matchSearch && matchStatus
     })
   }, [records, search, filterStatus])
 
-  const counts = useMemo(() => {
-    const now = Math.floor(Date.now() / 1000)
-    return {
-      all:     records.length,
-      active:  records.filter(r => r.expiresAt > now).length,
-      expired: records.filter(r => r.expiresAt <= now).length,
-    }
-  }, [records])
+  const counts = useMemo(() => ({
+    all:     records.length,
+    active:  records.filter(r => getQRStatus(r) === 'active').length,
+    expired: records.filter(r => getQRStatus(r) === 'expired').length,
+    revoked: records.filter(r => getQRStatus(r) === 'revoked').length,
+  }), [records])
+
+  function handleRevoke() {
+    if (!revokeTarget) return
+    qrStorage.revoke(revokeTarget.id)
+    reload()
+    setRevokeTarget(null)
+  }
 
   function handleDelete() {
     if (!deleteTarget) return
@@ -79,7 +83,7 @@ export function QRHistory() {
 
         {/* Filtros de status */}
         <div className="flex gap-1 bg-[#1a1d2e] border border-[#2d3255] rounded-lg p-1">
-          {(['all', 'active', 'expired'] as const).map(s => (
+          {(['all', 'active', 'expired', 'revoked'] as const).map(s => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -89,9 +93,10 @@ export function QRHistory() {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {s === 'all' ? `Todos (${counts.all})` :
-               s === 'active' ? `Ativos (${counts.active})` :
-               `Expirados (${counts.expired})`}
+              {s === 'all'     ? `Todos (${counts.all})` :
+               s === 'active'  ? `Ativos (${counts.active})` :
+               s === 'expired' ? `Expirados (${counts.expired})` :
+               `Revogados (${counts.revoked})`}
             </button>
           ))}
         </div>
@@ -141,11 +146,9 @@ export function QRHistory() {
                     <td className="px-5 py-3">
                       <div className="flex flex-col gap-1">
                         <Badge variant={status === 'active' ? 'success' : 'default'}>
-                          {status === 'active' ? (
-                            <><CheckCircle size={10} /> Ativo</>
-                          ) : (
-                            <><Clock size={10} /> Expirado</>
-                          )}
+                          {status === 'active'  ? <><CheckCircle size={10} /> Ativo</> :
+                           status === 'revoked' ? <><ShieldOff size={10} /> Revogado</> :
+                                                  <><Clock size={10} /> Expirado</>}
                         </Badge>
                         {status === 'active' && (
                           <span className="text-xs text-slate-600">
@@ -162,6 +165,15 @@ export function QRHistory() {
                         >
                           <Eye size={14} />
                         </button>
+                        {status === 'active' && (
+                          <button
+                            onClick={() => setRevokeTarget(record)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                            title="Revogar QR"
+                          >
+                            <ShieldOff size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => setDeleteTarget(record)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -229,6 +241,27 @@ export function QRHistory() {
             </Badge>
           </div>
         )}
+      </Modal>
+
+      {/* Modal confirmar revogação */}
+      <Modal
+        open={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        title="Revogar QR"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-300">
+            Revogar o QR de <strong className="text-white">{revokeTarget?.employeeName}</strong>?
+            O registro permanece no histórico marcado como revogado.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setRevokeTarget(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={handleRevoke}>
+              <ShieldOff size={14} /> Revogar
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Modal confirmar exclusão */}

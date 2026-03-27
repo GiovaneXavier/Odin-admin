@@ -1,21 +1,66 @@
-import { useState } from 'react'
-import { Eye, EyeOff, Save, CheckCircle, AlertTriangle, Info, Shield } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Eye, EyeOff, Save, CheckCircle, AlertTriangle, Info, Shield, Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
-import { settingsStorage } from '@/services/storage'
+import { employeeStorage, systemStorage, qrStorage, settingsStorage } from '@/services/storage'
 import type { OdinSettings } from '@/types'
 
 export function SettingsPage() {
-  const [settings, setSettings] = useState<OdinSettings>(() => settingsStorage.get())
-  const [showQr,   setShowQr]   = useState(false)
-  const [showToken, setShowToken] = useState(false)
-  const [saved,    setSaved]    = useState(false)
+  const [settings,    setSettings]    = useState<OdinSettings>(() => settingsStorage.get())
+  const [showQr,      setShowQr]      = useState(false)
+  const [showToken,   setShowToken]   = useState(false)
+  const [saved,       setSaved]       = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importOk,    setImportOk]    = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   function handleSave() {
     settingsStorage.save(settings)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  function handleExport() {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      employees:  employeeStorage.getAll(),
+      systems:    systemStorage.getAll(),
+      qrRecords:  qrStorage.getAll(),
+      settings:   settingsStorage.get(),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `odin-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportError(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (data.employees)  localStorage.setItem('odin_employees',  JSON.stringify(data.employees))
+        if (data.systems)    localStorage.setItem('odin_systems',    JSON.stringify(data.systems))
+        if (data.qrRecords)  localStorage.setItem('odin_qr_records', JSON.stringify(data.qrRecords))
+        if (data.settings) {
+          localStorage.setItem('odin_settings', JSON.stringify(data.settings))
+          setSettings(data.settings)
+        }
+        setImportOk(true)
+        setTimeout(() => setImportOk(false), 3000)
+      } catch {
+        setImportError('Arquivo inválido. Certifique-se de usar um backup gerado por este sistema.')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
   }
 
   const isConfigured = !!settings.qrHmacKey
@@ -131,6 +176,44 @@ export function SettingsPage() {
             Este valor é pré-preenchido no gerador de QR. Recomendado: 10 minutos.
           </p>
         </div>
+      </Card>
+
+      {/* Backup / Restore */}
+      <Card>
+        <div className="flex items-center gap-2 mb-1">
+          <Download size={16} className="text-blue-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Backup e Restauração</h3>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Exporte todos os dados (funcionários, sistemas, histórico de QRs e configurações) para
+          um arquivo JSON. Use para migrar entre máquinas ou para recuperação em caso de limpeza
+          do browser.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={handleExport}>
+            <Download size={14} /> Exportar backup
+          </Button>
+          <Button variant="secondary" onClick={() => importRef.current?.click()}>
+            <Upload size={14} /> Importar backup
+          </Button>
+          <input
+            ref={importRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImport}
+          />
+        </div>
+        {importOk && (
+          <p className="mt-3 text-xs text-emerald-400 flex items-center gap-1">
+            <CheckCircle size={12} /> Dados restaurados com sucesso.
+          </p>
+        )}
+        {importError && (
+          <p className="mt-3 text-xs text-red-400 flex items-center gap-1">
+            <AlertTriangle size={12} /> {importError}
+          </p>
+        )}
       </Card>
 
       {/* Aviso de segurança */}
