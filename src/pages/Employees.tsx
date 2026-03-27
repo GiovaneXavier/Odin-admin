@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
-import { employeeStorage } from '@/services/storage'
+import { employeeStorage, qrStorage } from '@/services/storage'
+import { getQRStatus } from '@/services/qrService'
 import { formatDateShort } from '@/lib/utils'
 import type { Employee } from '@/types'
 
@@ -52,7 +53,7 @@ export function Employees() {
     if (!form.name.trim())  e.name  = 'Nome obrigatório'
     if (!form.area.trim())  e.area  = 'Área obrigatória'
     if (!editing && !form.id.trim()) e.id = 'ID obrigatório'
-    if (!editing && employees.some(emp => emp.id === form.id.trim())) {
+    if (!editing && employees.some(emp => emp.id === form.id.trim().toUpperCase())) {
       e.id = 'Este ID já existe'
     }
     setErrors(e)
@@ -81,6 +82,10 @@ export function Employees() {
     }
     reload()
     setModalOpen(false)
+  }
+
+  function activeQRsForEmployee(empId: string): number {
+    return qrStorage.getAll().filter(r => r.employeeId === empId && getQRStatus(r) === 'active').length
   }
 
   function handleDelete() {
@@ -225,18 +230,32 @@ export function Employees() {
         title="Confirmar Exclusão"
         size="sm"
       >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-300">
-            Tem certeza que deseja remover <strong className="text-white">{deleteTarget?.name}</strong>?
-            Esta ação não pode ser desfeita.
-          </p>
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={handleDelete}>
-              <Trash2 size={14} /> Remover
-            </Button>
-          </div>
-        </div>
+        {deleteTarget && (() => {
+          const activeCount = activeQRsForEmployee(deleteTarget.id)
+          return (
+            <div className="space-y-4">
+              {activeCount > 0 && (
+                <div className="flex gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+                  <span className="shrink-0">⚠️</span>
+                  <span>
+                    Este funcionário possui <strong>{activeCount} QR{activeCount !== 1 ? 's' : ''} ativo{activeCount !== 1 ? 's' : ''}</strong>.
+                    Após a exclusão esses QRs não poderão mais ser usados para cadastro.
+                  </span>
+                </div>
+              )}
+              <p className="text-sm text-slate-300">
+                Tem certeza que deseja remover <strong className="text-white">{deleteTarget.name}</strong>?
+                Esta ação não pode ser desfeita.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+                <Button variant="danger" onClick={handleDelete}>
+                  <Trash2 size={14} /> Remover
+                </Button>
+              </div>
+            </div>
+          )
+        })()}
       </Modal>
     </div>
   )

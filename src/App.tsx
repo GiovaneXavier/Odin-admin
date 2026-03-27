@@ -23,6 +23,7 @@ export default function App() {
               <Route path="/qr-generator" element={<QRGenerator />} />
               <Route path="/qr-history"   element={<QRHistory />} />
               <Route path="/settings"     element={<SettingsPage />} />
+              <Route path="*"            element={<div className="flex items-center justify-center h-full text-slate-500">Página não encontrada</div>} />
             </Routes>
           </main>
         </div>
