@@ -56,7 +56,7 @@ export function Systems() {
     if (!editing && systems.some(s => s.id === form.id.trim().toUpperCase())) {
       e.id = 'Este ID já existe'
     }
-    if (!form.cardColor) e.cardColor = 'Cor obrigatória'
+    if (!form.cardColor || !/^#[0-9A-Fa-f]{6}$/.test(form.cardColor)) e.cardColor = 'Cor inválida (ex: #1428A0)'
     setErrors(e)
     return Object.keys(e).length === 0
   }

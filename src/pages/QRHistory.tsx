@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { History, Search, Trash2, Eye, CheckCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -19,6 +19,12 @@ export function QRHistory() {
   const [clearConfirm, setClearConfirm] = useState(false)
 
   function reload() { setRecords(qrStorage.getAll()) }
+
+  // Atualiza contadores a cada 30s para refletir QRs que expiraram
+  useEffect(() => {
+    const id = setInterval(reload, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   const filtered = useMemo(() => {
     const now = Math.floor(Date.now() / 1000)

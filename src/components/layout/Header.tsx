@@ -1,7 +1,7 @@
-import { useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import { settingsStorage } from '@/services/storage'
-import { useNavigate } from 'react-router-dom'
 
 const PAGE_TITLES: Record<string, string> = {
   '/':             'Dashboard',
@@ -12,15 +12,24 @@ const PAGE_TITLES: Record<string, string> = {
   '/settings':     'Configurações',
 }
 
+function formatNow() {
+  return new Date().toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 export function Header() {
   const location = useLocation()
   const navigate = useNavigate()
   const title = PAGE_TITLES[location.pathname] ?? 'Odin Admin'
   const isConfigured = settingsStorage.isConfigured()
-  const now = new Date().toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+  const [now, setNow] = useState(formatNow)
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(formatNow()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-[#1e2235] bg-[#0f1117] shrink-0">

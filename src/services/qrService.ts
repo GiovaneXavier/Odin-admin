@@ -22,6 +22,8 @@ export async function generateRegistrationQR(
   if (!settings.qrHmacKey) throw new Error('Chave HMAC (qrHmacKey) não configurada. Acesse Configurações.')
 
   const { employee, system, validityMinutes } = params
+  if (!Number.isInteger(validityMinutes) || validityMinutes < 1)
+    throw new Error('Validade deve ser de no mínimo 1 minuto.')
   const now       = Math.floor(Date.now() / 1000)
   const expiresAt = now + validityMinutes * 60
   const nonce     = generateNonce()
