@@ -89,6 +89,13 @@ export const qrStorage = {
     save(KEYS.QR_RECORDS, list)
   },
 
+  revoke: (id: string): void => {
+    const now = Math.floor(Date.now() / 1000)
+    save(KEYS.QR_RECORDS, load<QRRecord>(KEYS.QR_RECORDS).map(r =>
+      r.id === id ? { ...r, revokedAt: now } : r
+    ))
+  },
+
   delete: (id: string): void => {
     save(KEYS.QR_RECORDS, load<QRRecord>(KEYS.QR_RECORDS).filter(r => r.id !== id))
   },

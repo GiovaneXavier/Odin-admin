@@ -1,4 +1,4 @@
-import type { Employee, OdinSystem, QRRecord, QRRegistrationPayload } from '@/types'
+import type { Employee, OdinSystem, QRRecord, QRRegistrationPayload, QRStatus } from '@/types'
 import { hmacSha256Base64Url, buildCanonical, generateNonce, generateId } from './crypto'
 import { settingsStorage, qrStorage } from './storage'
 
@@ -75,8 +75,9 @@ export async function generateRegistrationQR(
   return { payload, payloadJson, record }
 }
 
-/** Determina se um QRRecord ainda está ativo */
-export function getQRStatus(record: QRRecord): 'active' | 'expired' {
+/** Determina o status atual de um QRRecord */
+export function getQRStatus(record: QRRecord): QRStatus {
+  if (record.revokedAt != null) return 'revoked'
   const now = Math.floor(Date.now() / 1000)
   return now <= record.expiresAt ? 'active' : 'expired'
 }

@@ -37,7 +37,7 @@ export interface QRRegistrationPayload {
 }
 
 // ─── Registro de QR gerado (para histórico) ──────────────────────────────────
-export type QRStatus = 'active' | 'expired'
+export type QRStatus = 'active' | 'expired' | 'revoked'
 
 export interface QRRecord {
   id: string
@@ -48,7 +48,8 @@ export interface QRRecord {
   issuedAt: number
   expiresAt: number
   nonce: string
-  payload: string  // JSON stringificado do QRRegistrationPayload
+  payload: string       // JSON stringificado do QRRegistrationPayload
+  revokedAt?: number    // epoch Unix; presente quando revogado manualmente
 }
 
 // ─── Configurações do sistema ─────────────────────────────────────────────────
