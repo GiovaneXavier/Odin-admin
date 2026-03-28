@@ -53,8 +53,12 @@ export interface QRRecord {
 }
 
 // ─── Configurações do sistema ─────────────────────────────────────────────────
+export type StorageMode = 'local' | 'remote'
+
 export interface OdinSettings {
   qrHmacKey: string
   tokenHmacKey: string
   defaultQrValidityMinutes: number
+  storageMode: StorageMode
+  apiBaseUrl: string
 }

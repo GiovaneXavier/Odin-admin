@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Eye, EyeOff, Save, CheckCircle, AlertTriangle, Info, Shield, Download, Upload } from 'lucide-react'
+import { Eye, EyeOff, Save, CheckCircle, AlertTriangle, Info, Shield, Download, Upload, Server } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
@@ -175,6 +175,49 @@ export function SettingsPage() {
           <p className="text-xs text-slate-600">
             Este valor é pré-preenchido no gerador de QR. Recomendado: 10 minutos.
           </p>
+        </div>
+      </Card>
+
+      {/* Backend / Storage mode */}
+      <Card>
+        <div className="flex items-center gap-2 mb-1">
+          <Server size={16} className="text-blue-400" />
+          <h3 className="text-sm font-semibold text-slate-200">Integração com Backend</h3>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Por padrão os dados ficam no localStorage do navegador. Quando um backend REST estiver
+          disponível, selecione "Remoto" e configure a URL base da API.
+        </p>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Modo de armazenamento
+            </label>
+            <div className="flex gap-2">
+              {(['local', 'remote'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setSettings(s => ({ ...s, storageMode: mode }))}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                    settings.storageMode === mode
+                      ? 'bg-[#1428A0] border-[#1428A0] text-white'
+                      : 'bg-transparent border-[#2d3255] text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {mode === 'local' ? 'Local (localStorage)' : 'Remoto (API REST)'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {settings.storageMode === 'remote' && (
+            <Input
+              label="URL base da API"
+              type="url"
+              value={settings.apiBaseUrl}
+              onChange={e => setSettings(s => ({ ...s, apiBaseUrl: e.target.value }))}
+              placeholder="https://api.sua-empresa.com/odin"
+            />
+          )}
         </div>
       </Card>
 

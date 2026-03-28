@@ -110,10 +110,13 @@ const DEFAULT_SETTINGS: OdinSettings = {
   qrHmacKey: '',
   tokenHmacKey: '',
   defaultQrValidityMinutes: 10,
+  storageMode: 'local',
+  apiBaseUrl: '',
 }
 
 export const settingsStorage = {
-  get: (): OdinSettings => loadOne<OdinSettings>(KEYS.SETTINGS) ?? DEFAULT_SETTINGS,
+  // Merge with defaults so new fields are always present on existing installations.
+  get: (): OdinSettings => ({ ...DEFAULT_SETTINGS, ...(loadOne<OdinSettings>(KEYS.SETTINGS) ?? {}) }),
 
   save: (settings: OdinSettings): void => {
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings))
