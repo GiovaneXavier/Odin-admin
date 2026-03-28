@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react'
-import { History, Search, Trash2, Eye, CheckCircle, Clock, ShieldOff } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { History, Search, Trash2, Eye, CheckCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Card } from '@/components/ui/Card'
@@ -18,6 +18,11 @@ export function QRHistory() {
   const [deleteTarget,  setDeleteTarget]  = useState<QRRecord | null>(null)
   const [revokeTarget,  setRevokeTarget]  = useState<QRRecord | null>(null)
   const [clearConfirm,  setClearConfirm]  = useState(false)
+  const [page,          setPage]          = useState(0)
+
+  const PAGE_SIZE = 20
+
+  const resetPage = useCallback(() => setPage(0), [])
 
   function reload() { setRecords(qrStorage.getAll()) }
 
@@ -28,6 +33,7 @@ export function QRHistory() {
   }, [])
 
   const filtered = useMemo(() => {
+    resetPage()
     return records.filter(r => {
       const matchSearch =
         r.employeeName.toLowerCase().includes(search.toLowerCase()) ||
@@ -38,7 +44,11 @@ export function QRHistory() {
 
       return matchSearch && matchStatus
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [records, search, filterStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const counts = useMemo(() => ({
     all:     records.length,
@@ -129,7 +139,7 @@ export function QRHistory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2235]">
-              {filtered.map(record => {
+              {paginated.map(record => {
                 const status = getQRStatus(record)
                 return (
                   <tr key={record.id} className="hover:bg-[#1a1d2e] transition-colors">
@@ -190,10 +200,34 @@ export function QRHistory() {
         )}
       </Card>
 
-      <p className="text-xs text-slate-600">
-        {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
-        {filterStatus !== 'all' ? ` (filtrado de ${records.length})` : ''}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-600">
+          {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+          {filterStatus !== 'all' ? ` (filtrado de ${records.length})` : ''}
+        </p>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#2d3255] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-xs text-slate-500">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#2d3255] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Modal visualizar QR */}
       <Modal
