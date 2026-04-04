@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Token Teste — Heimdall</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: monospace; background: #0f1117; color: #e2e8f0; display: flex; flex-direction: column; align-items: center; padding: 32px 20px; gap: 20px; }
+    h1 { color: #60a5fa; margin: 0; font-size: 20px; }
+    .card { background: #1a1d2e; border: 1px solid #2d3255; border-radius: 12px; padding: 20px; width: 100%; max-width: 560px; }
+    .card h2 { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 12px; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #64748b; }
+    input { background: #0f1117; border: 1px solid #2d3255; color: #e2e8f0; padding: 8px 10px; border-radius: 6px; font-family: monospace; font-size: 12px; width: 100%; }
+    input:focus { outline: none; border-color: #1428A0; }
+    #qrcode { background: white; padding: 12px; border-radius: 12px; }
+    .token-box { background: #0f1117; border: 1px solid #2d3255; border-radius: 8px; padding: 12px; font-size: 11px; word-break: break-all; color: #a5b4fc; }
+    .status { font-size: 13px; text-align: center; }
+    .ok   { color: #34d399; }
+    .warn { color: #fbbf24; }
+    .err  { color: #f87171; }
+    .countdown { font-size: 28px; font-weight: bold; color: #60a5fa; text-align: center; }
+    button { background: #1428A0; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: monospace; width: 100%; }
+    button:hover { background: #1a35c4; }
+    .tag { display: inline-block; background: #1e293b; color: #94a3b8; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Token de Acesso — Teste Heimdall</h1>
+
+  <div class="card">
+    <h2>Configuração</h2>
+    <div class="fields">
+      <label>
+        System ID <span style="color:#f87171">*</span>
+        <input id="systemId" placeholder="ex: SISTEMA_TESTE" value="SISTEMA_TESTE" />
+      </label>
+      <label>
+        Employee ID
+        <input id="employeeId" placeholder="ex: TEST-001" value="TEST-001" />
+      </label>
+      <label>
+        Device ID
+        <input id="deviceId" placeholder="ex: SRBR-AAAA-BBBB" value="SRBR-TEST-0001" />
+      </label>
+      <label>
+        HMAC Key
+        <input id="hmacKey" value="SRBR_HEIMDALL_TOKEN_SECRET_2024" />
+      </label>
+    </div>
+    <br/>
+    <button onclick="gerarNovo()">↻ Gerar Token</button>
+  </div>
+
+  <div class="countdown" id="countdown">--</div>
+  <div class="status" id="status"></div>
+
+  <div id="qrcode"></div>
+
+  <div class="card">
+    <h2>Token gerado <span class="tag">deviceId|employeeId|systemId|timestamp|nonce.hmac</span></h2>
+    <div class="token-box" id="tokenBox">—</div>
+  </div>
+
+  <script>
+    let intervalId = null
+    let expiresAt  = 0
+
+    function generateNonce() {
+      const arr = new Uint8Array(3)
+      crypto.getRandomValues(arr)
+      return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+
+    function toBase64Url(buffer) {
+      const bytes = new Uint8Array(buffer)
+      let bin = ''
+      for (const b of bytes) bin += String.fromCharCode(b)
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    }
+
+    async function hmacSign(secret, data) {
+      const enc = new TextEncoder()
+      const key = await crypto.subtle.importKey(
+        'raw', enc.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false, ['sign']
+      )
+      const sig = await crypto.subtle.sign('HMAC', key, enc.encode(data))
+      return toBase64Url(sig)
+    }
+
+    async function gerarToken() {
+      const deviceId   = document.getElementById('deviceId').value.trim()
+      const employeeId = document.getElementById('employeeId').value.trim()
+      const systemId   = document.getElementById('systemId').value.trim()
+      const hmacKey    = document.getElementById('hmacKey').value.trim()
+
+      if (!systemId) {
+        document.getElementById('status').innerHTML = '<span class="err">⚠ Preencha o System ID</span>'
+        return
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000)
+      const nonce     = generateNonce()
+      expiresAt       = timestamp + 30
+
+      // payload = tudo antes do '.'
+      const payload   = `${deviceId}|${employeeId}|${systemId}|${timestamp}|${nonce}`
+      const signature = await hmacSign(hmacKey, payload)
+      const token     = `${payload}.${signature}`
+
+      // Atualiza QR
+      document.getElementById('qrcode').innerHTML = ''
+      new QRCode(document.getElementById('qrcode'), {
+        text:         token,
+        width:        260,
+        height:       260,
+        correctLevel: QRCode.CorrectLevel.M,
+      })
+
+      document.getElementById('tokenBox').textContent = token
+      document.getElementById('status').innerHTML =
+        `<span class="ok">✓ Token gerado — válido por 30s</span><br/>` +
+        `<span class="warn" style="font-size:11px">Etapa 4 (backend) pode retornar SERVER_UNAVAILABLE se não houver servidor</span>`
+
+      // Inicia countdown
+      clearInterval(intervalId)
+      atualizarContagem()
+      intervalId = setInterval(atualizarContagem, 1000)
+    }
+
+    function atualizarContagem() {
+      const restante = expiresAt - Math.floor(Date.now() / 1000)
+      const el = document.getElementById('countdown')
+      if (restante <= 0) {
+        el.textContent = '⌛ EXPIRADO'
+        el.className = 'countdown err'
+        document.getElementById('status').innerHTML =
+          '<span class="err">Token expirado — gere um novo</span>'
+        clearInterval(intervalId)
+      } else {
+        el.textContent = `${restante}s`
+        el.className = 'countdown ' + (restante <= 5 ? 'err' : restante <= 10 ? 'warn' : 'ok')
+      }
+    }
+
+    async function gerarNovo() {
+      clearInterval(intervalId)
+      await gerarToken()
+    }
+
+    gerarToken()
+  </script>
+</body>
+</html>
